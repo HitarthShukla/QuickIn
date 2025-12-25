@@ -1,0 +1,42 @@
+import { Router } from 'express'
+import {
+    register,
+    verifyOTP,
+    resendOTP,
+    login,
+    getMe,
+    updateProfile,
+    logout,
+    forgotPassword,
+    resetPassword
+} from '../controllers/authController.js'
+import { protect } from '../middleware/auth.js'
+import {
+    loginLimiter,
+    registerLimiter,
+    otpLimiter
+} from '../middleware/rateLimiter.js'
+import {
+    registerValidation,
+    loginValidation,
+    verifyOtpValidation,
+    resendOtpValidation
+} from '../middleware/validators.js'
+
+const router = Router()
+
+// Public routes with rate limiting and validation
+router.post('/register', registerLimiter, registerValidation, register)
+router.post('/verify-otp', otpLimiter, verifyOtpValidation, verifyOTP)
+router.post('/resend-otp', otpLimiter, resendOtpValidation, resendOTP)
+router.post('/login', loginLimiter, loginValidation, login)
+router.post('/forgot-password', otpLimiter, resendOtpValidation, forgotPassword)
+router.post('/reset-password', otpLimiter, resetPassword)
+
+// Protected routes
+router.get('/me', protect, getMe)
+router.put('/profile', protect, updateProfile)
+router.post('/logout', protect, logout)
+
+export default router
+
