@@ -3,11 +3,11 @@ import { useAuthStore } from '@/stores/auth'
 
 // Lazy-loaded pages
 const Home = () => import('@/pages/Home.vue')
-const Login = () => import('@/pages/Login.vue')
-const Register = () => import('@/pages/Register.vue')
-const VerifyOTP = () => import('@/pages/VerifyOTP.vue')
-const ForgotPassword = () => import('@/pages/ForgotPassword.vue')
-const ResetPassword = () => import('@/pages/ResetPassword.vue')
+const Login = () => import('@/pages/auth/Login.vue')
+const Register = () => import('@/pages/auth/Register.vue')
+const VerifyOTP = () => import('@/pages/auth/VerifyOTP.vue')
+const ForgotPassword = () => import('@/pages/auth/ForgotPassword.vue')
+const ResetPassword = () => import('@/pages/auth/ResetPassword.vue')
 const Dashboard = () => import('@/pages/Dashboard.vue')
 const Profile = () => import('@/pages/Profile.vue')
 
