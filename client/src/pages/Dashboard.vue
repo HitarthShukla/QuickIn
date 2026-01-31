@@ -8,6 +8,7 @@ import RightSidebar from '@/components/dashboard/RightSidebar.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import LocationBlocker from '@/components/common/LocationBlocker.vue'
 import CreatePostModal from '@/components/modals/CreatePostModal.vue'
+import postService from '@/services/postService'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -16,6 +17,8 @@ const isLoaded = ref(false)
 const showLogoutDialog = ref(false)
 const showCreatePostModal = ref(false)
 const viewMode = ref<'feed' | 'map'>('feed')
+const feedKey = ref(0)
+const isCreatingPost = ref(false)
 
 // Data from API (empty by default)
 
@@ -38,10 +41,65 @@ const handleLogout = async () => {
   router.push('/')
 }
 
-const handleCreatePost = (content: string) => {
-  console.log('Creating post:', content)
-  // Logic to add post would go here
-  showCreatePostModal.value = false
+const compressImage = (file: File, maxWidth: number = 1024, maxHeight: number = 1024, quality: number = 0.7): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.readAsDataURL(file)
+    reader.onload = (event) => {
+      const img = new Image()
+      img.src = event.target?.result as string
+      img.onload = () => {
+        let width = img.width
+        let height = img.height
+
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width
+          width = maxWidth
+        }
+        if (height > maxHeight) {
+          width = (width * maxHeight) / height
+          height = maxHeight
+        }
+
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx?.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.onerror = (error) => reject(error)
+    }
+    reader.onerror = (error) => reject(error)
+  })
+}
+
+const handleCreatePost = async (payload: { content: string; file: File | null }) => {
+  try {
+    isCreatingPost.value = true
+    let image = ''
+    
+    if (payload.file) {
+      if (payload.file.type.startsWith('image/')) {
+        image = await compressImage(payload.file)
+      }
+      // Handle other file types if needed
+    }
+
+    await postService.createPost({
+      content: payload.content,
+      image: image || undefined
+    })
+
+    // Refresh feed
+    feedKey.value++
+    showCreatePostModal.value = false
+  } catch (error) {
+    console.error('Failed to create post:', error)
+    // Could add error handling/notification here
+  } finally {
+    isCreatingPost.value = false
+  }
 }
 
 const initials = computed(() => {
@@ -82,7 +140,7 @@ const initials = computed(() => {
 
           <!-- Center Feed -->
           <div class="lg:col-span-2 xl:col-span-3">
-            <FeedSection />
+            <FeedSection :key="feedKey" />
           </div>
 
           <!-- Right Sidebar (Widgets) -->
@@ -112,6 +170,7 @@ const initials = computed(() => {
     <!-- Create Post Modal -->
     <CreatePostModal
       :show="showCreatePostModal"
+      :is-creating="isCreatingPost"
       @close="showCreatePostModal = false"
       @post="handleCreatePost"
     />

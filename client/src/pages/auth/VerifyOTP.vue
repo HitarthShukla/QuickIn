@@ -183,7 +183,7 @@ const handleResendOTP = async () => {
               <!-- Submit Button -->
               <button
                 type="submit"
-                class="submit-btn group"
+                class="submit-btn group cursor-pointer"
                 :disabled="isSubmitting || !isOtpComplete"
               >
                 <span class="btn-bg"></span>
@@ -204,7 +204,7 @@ const handleResendOTP = async () => {
                 <button
                   @click="handleResendOTP"
                   :disabled="resendCooldown > 0 || isResending"
-                  class="text-primary-400 hover:text-primary-300 font-medium ml-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                  class="text-primary-400 hover:text-primary-300 font-medium ml-1 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {{ resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend' }}
                 </button>

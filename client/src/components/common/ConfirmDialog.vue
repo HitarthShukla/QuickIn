@@ -72,13 +72,13 @@ const typeColors = computed(() => {
           <div class="flex gap-3">
             <button
               @click="emit('cancel')"
-              class="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition-colors"
+              class="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-medium transition-colors cursor-pointer"
             >
               {{ cancelText || 'Cancel' }}
             </button>
             <button
               @click="emit('confirm')"
-              :class="['flex-1 px-4 py-3 text-white rounded-xl font-medium transition-colors', typeColors.button]"
+              :class="['flex-1 px-4 py-3 text-white rounded-xl font-medium transition-colors cursor-pointer', typeColors.button]"
             >
               {{ confirmText || 'Confirm' }}
             </button>

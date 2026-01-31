@@ -7,6 +7,7 @@ import morgan from 'morgan'
 
 import connectDB from './config/db.js'
 import authRoutes from './routes/auth.js'
+import postRoutes from './routes/posts.js'
 import { initializeSocket } from './socket/index.js'
 
 // Initialize Express
@@ -35,6 +36,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
 // Routes
 app.use('/api/auth', authRoutes)
+app.use('/api/posts', postRoutes)
 
 // Health check
 app.get('/api/health', (_req, res) => {

@@ -3,6 +3,7 @@ import { ref } from 'vue'
 
 defineProps<{
   show: boolean
+  isCreating?: boolean
 }>()
 
 const emit = defineEmits(['close', 'post'])
@@ -34,10 +35,6 @@ const handlePost = () => {
     content: content.value,
     file: selectedFile.value
   })
-  
-  content.value = ''
-  selectedFile.value = null
-  emit('close')
 }
 </script>
 
@@ -127,10 +124,14 @@ const handlePost = () => {
 
           <button 
             @click="handlePost"
-            :disabled="!content.trim() && !selectedFile"
-            class="px-8 py-2.5 bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-full transition-all text-base shadow-lg shadow-primary-500/20 cursor-pointer"
+            :disabled="(!content.trim() && !selectedFile) || isCreating"
+            class="px-8 py-2.5 bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-full transition-all text-base shadow-lg shadow-primary-500/20 cursor-pointer flex items-center gap-2"
           >
-            Post
+            <svg v-if="isCreating" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            {{ isCreating ? 'Posting...' : 'Post' }}
           </button>
         </div>
       </div>
