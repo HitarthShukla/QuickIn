@@ -62,3 +62,69 @@ export interface ProfileUpdatePayload {
     availabilityStatus?: AvailabilityStatus
     languages?: string[]
 }
+
+// Activity types
+export type ActivityType = 'sport' | 'movie' | 'gaming' | 'study' | 'food' | 'event' | 'hangout' | 'other'
+export type ActivityStatus = 'open' | 'in-progress' | 'completed' | 'cancelled'
+
+export interface ActivityLocation {
+    type: 'Point'
+    coordinates: [number, number] // [longitude, latitude]
+    address?: string
+    placeName?: string
+}
+
+export interface Activity {
+    _id: string
+    creator: User
+    title: string
+    description: string
+    type: ActivityType
+    status: ActivityStatus
+    location: ActivityLocation
+    dateTime: string
+    duration?: number
+    maxParticipants: number
+    participants: User[]
+    interests?: string[]
+    requirements?: string
+    image?: string
+    createdAt: string
+    updatedAt: string
+}
+
+export interface CreateActivityPayload {
+    title: string
+    description: string
+    type: ActivityType
+    location: {
+        type: 'Point'
+        coordinates: [number, number]
+        address?: string
+        placeName?: string
+    }
+    dateTime: string
+    duration?: number
+    maxParticipants: number
+    interests?: string[]
+    requirements?: string
+    image?: string
+}
+
+export interface ActivitiesResponse {
+    success: boolean
+    count: number
+    pagination?: {
+        page: number
+        pages: number
+        total: number
+    }
+    activities: Activity[]
+}
+
+export interface ActivityResponse {
+    success: boolean
+    message?: string
+    activity: Activity
+}
+

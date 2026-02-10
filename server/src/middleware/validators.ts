@@ -117,3 +117,64 @@ export const resendOtpValidation = [
 
     handleValidationErrors,
 ]
+
+// Activity validation
+export const validateActivity = [
+    body('title')
+        .trim()
+        .notEmpty()
+        .withMessage('Title is required')
+        .isLength({ min: 3, max: 100 })
+        .withMessage('Title must be between 3 and 100 characters'),
+
+    body('description')
+        .trim()
+        .notEmpty()
+        .withMessage('Description is required')
+        .isLength({ max: 500 })
+        .withMessage('Description cannot exceed 500 characters'),
+
+    body('type')
+        .notEmpty()
+        .withMessage('Activity type is required')
+        .isIn(['sport', 'movie', 'gaming', 'study', 'food', 'event', 'hangout', 'other'])
+        .withMessage('Invalid activity type'),
+
+    body('location.coordinates')
+        .isArray({ min: 2, max: 2 })
+        .withMessage('Location coordinates must be [longitude, latitude]'),
+
+    body('location.coordinates.0')
+        .isFloat({ min: -180, max: 180 })
+        .withMessage('Longitude must be between -180 and 180'),
+
+    body('location.coordinates.1')
+        .isFloat({ min: -90, max: 90 })
+        .withMessage('Latitude must be between -90 and 90'),
+
+    body('dateTime')
+        .notEmpty()
+        .withMessage('Date and time is required')
+        .isISO8601()
+        .withMessage('Invalid date format')
+        .custom((value) => {
+            const date = new Date(value)
+            if (date <= new Date()) {
+                throw new Error('Activity date must be in the future')
+            }
+            return true
+        }),
+
+    body('maxParticipants')
+        .notEmpty()
+        .withMessage('Max participants is required')
+        .isInt({ min: 2, max: 100 })
+        .withMessage('Max participants must be between 2 and 100'),
+
+    body('duration')
+        .optional()
+        .isInt({ min: 15, max: 1440 })
+        .withMessage('Duration must be between 15 minutes and 24 hours'),
+
+    handleValidationErrors,
+]

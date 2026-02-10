@@ -3,22 +3,23 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import LeftSidebar from '@/components/dashboard/LeftSidebar.vue'
-import FeedSection from '@/components/dashboard/FeedSection.vue'
+import ActivityFeedSection from '@/components/dashboard/ActivityFeedSection.vue'
 import RightSidebar from '@/components/dashboard/RightSidebar.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import LocationBlocker from '@/components/common/LocationBlocker.vue'
-import CreatePostModal from '@/components/modals/CreatePostModal.vue'
-import postService from '@/services/postService'
+import CreateActivityModal from '@/components/modals/CreateActivityModal.vue'
+import activityService from '@/services/activityService'
+import type { CreateActivityPayload } from '@/types'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 const isLoaded = ref(false)
 const showLogoutDialog = ref(false)
-const showCreatePostModal = ref(false)
-const viewMode = ref<'feed' | 'map'>('feed')
-const feedKey = ref(0)
-const isCreatingPost = ref(false)
+const showCreateActivityModal = ref(false)
+const activityKey = ref(0)
+const isCreatingActivity = ref(false)
+const activeView = ref<'activities' | 'map'>('activities')
 
 // Data from API (empty by default)
 
@@ -41,64 +42,19 @@ const handleLogout = async () => {
   router.push('/')
 }
 
-const compressImage = (file: File, maxWidth: number = 1024, maxHeight: number = 1024, quality: number = 0.7): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.readAsDataURL(file)
-    reader.onload = (event) => {
-      const img = new Image()
-      img.src = event.target?.result as string
-      img.onload = () => {
-        let width = img.width
-        let height = img.height
-
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width
-          width = maxWidth
-        }
-        if (height > maxHeight) {
-          width = (width * maxHeight) / height
-          height = maxHeight
-        }
-
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        ctx?.drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL('image/jpeg', quality))
-      }
-      img.onerror = (error) => reject(error)
-    }
-    reader.onerror = (error) => reject(error)
-  })
-}
-
-const handleCreatePost = async (payload: { content: string; file: File | null }) => {
+const handleCreateActivity = async (payload: CreateActivityPayload) => {
   try {
-    isCreatingPost.value = true
-    let image = ''
+    isCreatingActivity.value = true
+    await activityService.createActivity(payload)
     
-    if (payload.file) {
-      if (payload.file.type.startsWith('image/')) {
-        image = await compressImage(payload.file)
-      }
-      // Handle other file types if needed
-    }
-
-    await postService.createPost({
-      content: payload.content,
-      image: image || undefined
-    })
-
-    // Refresh feed
-    feedKey.value++
-    showCreatePostModal.value = false
-  } catch (error) {
-    console.error('Failed to create post:', error)
-    // Could add error handling/notification here
+    // Refresh activity feed
+    activityKey.value++
+    showCreateActivityModal.value = false
+  } catch (error: any) {
+    console.error('Failed to create activity:', error)
+    alert(error.response?.data?.message || 'Failed to create activity')
   } finally {
-    isCreatingPost.value = false
+    isCreatingActivity.value = false
   }
 }
 
@@ -125,8 +81,11 @@ const initials = computed(() => {
     <!-- Main Content -->
     <main class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div :class="['', isLoaded ? 'animate-fade-in' : 'opacity-0']">
-        
-
+        <!-- Page Header -->
+        <div class="mb-6">
+          <h1 class="text-3xl font-bold text-white mb-2">Feed</h1>
+          <p class="text-gray-400">Discover and join activities</p>
+        </div>
 
         <!-- 3-Column Layout -->
         <div class="grid grid-cols-1 lg:grid-cols-4 xl:grid-cols-5 gap-6">
@@ -134,13 +93,65 @@ const initials = computed(() => {
           <!-- Left Sidebar (Services) -->
           <div class="hidden lg:block lg:col-span-1">
             <div class="sticky top-24">
-              <LeftSidebar @logout="confirmLogout" @create-post="showCreatePostModal = true" />
+              <LeftSidebar @logout="confirmLogout" />
             </div>
           </div>
 
           <!-- Center Feed -->
           <div class="lg:col-span-2 xl:col-span-3">
-            <FeedSection :key="feedKey" />
+            <!-- View Tabs -->
+            <div class="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-2 mb-4 flex gap-2">
+              <button
+                @click="activeView = 'activities'"
+                :class="[
+                  'flex-1 py-3 px-4 rounded-xl font-semibold transition-all duration-200',
+                  activeView === 'activities'
+                    ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-lg shadow-primary-500/25'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                ]"
+              >
+                <div class="flex items-center justify-center gap-2">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  Activities
+                </div>
+              </button>
+              <button
+                @click="activeView = 'map'"
+                :class="[
+                  'flex-1 py-3 px-4 rounded-xl font-semibold transition-all duration-200',
+                  activeView === 'map'
+                    ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white shadow-lg shadow-primary-500/25'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                ]"
+              >
+                <div class="flex items-center justify-center gap-2">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                  Map View
+                </div>
+              </button>
+            </div>
+
+            <!-- Activities View -->
+            <div v-if="activeView === 'activities'">
+              <ActivityFeedSection :key="activityKey" />
+            </div>
+
+            <!-- Map View (Empty for now) -->
+            <div v-else-if="activeView === 'map'" class="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-12">
+              <div class="text-center">
+                <div class="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary-500/20 to-secondary-500/20 border border-primary-500/30 flex items-center justify-center">
+                  <svg class="w-10 h-10 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                  </svg>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">Map View Coming Soon</h3>
+                <p class="text-gray-400">Interactive map with nearby activities will be available here</p>
+              </div>
+            </div>
           </div>
 
           <!-- Right Sidebar (Widgets) -->
@@ -167,12 +178,12 @@ const initials = computed(() => {
       @cancel="showLogoutDialog = false"
     />
 
-    <!-- Create Post Modal -->
-    <CreatePostModal
-      :show="showCreatePostModal"
-      :is-creating="isCreatingPost"
-      @close="showCreatePostModal = false"
-      @post="handleCreatePost"
+    <!-- Create Activity Modal -->
+    <CreateActivityModal
+      :show="showCreateActivityModal"
+      :is-creating="isCreatingActivity"
+      @close="showCreateActivityModal = false"
+      @create="handleCreateActivity"
     />
   </div>
   </LocationBlocker>

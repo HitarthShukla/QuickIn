@@ -73,13 +73,6 @@ const menuItems = [
         </button>
       </nav>
     </div>
-
-    <!-- Post Button -->
-    <button 
-      @click="$emit('create-post')"
-      class="w-full py-3 bg-primary-500 hover:bg-primary-600 text-white font-bold rounded-full shadow-lg shadow-primary-500/25 transition-all transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-    >
-      New Post
-    </button>
   </aside>
 </template>
+

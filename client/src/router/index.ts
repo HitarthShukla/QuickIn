@@ -9,6 +9,7 @@ const VerifyOTP = () => import('@/pages/auth/VerifyOTP.vue')
 const ForgotPassword = () => import('@/pages/auth/ForgotPassword.vue')
 const ResetPassword = () => import('@/pages/auth/ResetPassword.vue')
 const Dashboard = () => import('@/pages/Dashboard.vue')
+const Activities = () => import('@/pages/Activities.vue')
 const Profile = () => import('@/pages/Profile.vue')
 
 const routes: RouteRecordRaw[] = [
@@ -51,6 +52,12 @@ const routes: RouteRecordRaw[] = [
         path: '/dashboard',
         name: 'dashboard',
         component: Dashboard,
+        meta: { requiresAuth: true },
+    },
+    {
+        path: '/activities',
+        name: 'activities',
+        component: Activities,
         meta: { requiresAuth: true },
     },
     {
