@@ -7,6 +7,7 @@ import {
     joinActivity, 
     leaveActivity,
     updateActivityStatus,
+    updateActivity,
     deleteActivity
 } from '../controllers/activityController.js'
 import { protect } from '../middleware/auth.js'
@@ -22,6 +23,7 @@ router.post('/', validateActivity, createActivity)
 router.get('/', getActivities)
 router.get('/nearby', getNearbyActivities)
 router.get('/:id', getActivityById)
+router.put('/:id', validateActivity, updateActivity)
 router.delete('/:id', deleteActivity)
 
 // Activity participation routes

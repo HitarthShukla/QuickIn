@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import type { ActivityType } from '@/types'
+import { ref, computed, watch, onMounted } from 'vue'
+import type { Activity, ActivityType } from '@/types'
 
-defineProps<{
+const props = defineProps<{
   show: boolean
-  isCreating?: boolean
+  activity: Activity
+  isSaving?: boolean
 }>()
 
-const emit = defineEmits(['close', 'create'])
+const emit = defineEmits(['close', 'update', 'delete'])
 
 const title = ref('')
 const description = ref('')
@@ -26,6 +27,7 @@ const newInterest = ref('')
 const isGeocodingLocation = ref(false)
 const geocodingError = ref('')
 const locationSuggestions = ref<any[]>([])
+const showDeleteConfirm = ref(false)
 let geocodeTimeout: NodeJS.Timeout | null = null
 
 const activityTypes = [
@@ -39,6 +41,25 @@ const activityTypes = [
   { value: 'other', label: 'Other', icon: '✨', color: 'from-gray-500 to-slate-500' },
 ]
 
+// Initialize form with activity data
+const initializeForm = () => {
+  if (props.activity) {
+    title.value = props.activity.title || ''
+    description.value = props.activity.description || ''
+    type.value = props.activity.type || 'hangout'
+    dateTime.value = props.activity.dateTime ? new Date(props.activity.dateTime).toISOString().slice(0, 16) : ''
+    duration.value = props.activity.duration || 60
+    maxParticipants.value = props.activity.maxParticipants || 5
+    location.value = {
+      placeName: props.activity.location?.placeName || '',
+      address: props.activity.location?.address || '',
+      coordinates: props.activity.location?.coordinates || [0, 0]
+    }
+    requirements.value = props.activity.requirements || ''
+    interests.value = [...(props.activity.interests || [])]
+  }
+}
+
 // Geocode location using Nominatim API
 const geocodeLocation = async (query: string) => {
   if (!query || query.trim().length < 3) {
@@ -50,7 +71,6 @@ const geocodeLocation = async (query: string) => {
     isGeocodingLocation.value = true
     geocodingError.value = ''
     
-    // Use Nominatim API with country filter for India
     const response = await fetch(
       `https://nominatim.openstreetmap.org/search?` +
       `q=${encodeURIComponent(query)}&` +
@@ -92,7 +112,7 @@ watch(() => location.value.placeName, (newValue) => {
   if (newValue && newValue.trim().length >= 3) {
     geocodeTimeout = setTimeout(() => {
       geocodeLocation(newValue)
-    }, 500) // Debounce for 500ms
+    }, 500)
   } else {
     locationSuggestions.value = []
   }
@@ -107,7 +127,7 @@ const selectLocationSuggestion = (suggestion: any) => {
   geocodingError.value = ''
 }
 
-// Get user's current location as fallback
+// Get user's current location
 const getCurrentLocation = () => {
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
@@ -115,7 +135,6 @@ const getCurrentLocation = () => {
         const lat = position.coords.latitude
         const lon = position.coords.longitude
         
-        // Reverse geocode to get address
         try {
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?` +
@@ -153,7 +172,7 @@ const removeInterest = (interest: string) => {
 
 const minDateTime = computed(() => {
   const now = new Date()
-  now.setMinutes(now.getMinutes() + 30) // At least 30 minutes in the future
+  now.setMinutes(now.getMinutes() + 30)
   return now.toISOString().slice(0, 16)
 })
 
@@ -167,7 +186,7 @@ const isValid = computed(() => {
          maxParticipants.value >= 2
 })
 
-const handleCreate = () => {
+const handleUpdate = () => {
   if (!isValid.value) return
   
   const activityData = {
@@ -187,17 +206,24 @@ const handleCreate = () => {
     requirements: requirements.value.trim() || undefined
   }
   
-  console.log('Creating activity with location:', {
-    placeName: activityData.location.placeName,
-    coordinates: activityData.location.coordinates,
-    latLng: [activityData.location.coordinates[1], activityData.location.coordinates[0]]
-  })
-  
-  emit('create', activityData)
+  emit('update', activityData)
 }
 
-// Initialize location on mount
-getCurrentLocation()
+const handleDelete = () => {
+  emit('delete')
+  showDeleteConfirm.value = false
+}
+
+// Initialize form when activity changes
+watch(() => props.activity, () => {
+  if (props.show) {
+    initializeForm()
+  }
+}, { immediate: true })
+
+onMounted(() => {
+  initializeForm()
+})
 </script>
 
 <template>
@@ -220,7 +246,7 @@ getCurrentLocation()
       >
         <!-- Header -->
         <div class="sticky top-0 z-10 flex items-center justify-between p-6 border-b border-white/10 bg-slate-900">
-          <h3 class="text-xl font-bold text-white">Create Activity</h3>
+          <h3 class="text-xl font-bold text-white">Edit Activity</h3>
           <button @click="$emit('close')" class="text-gray-400 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-lg cursor-pointer">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -426,6 +452,39 @@ getCurrentLocation()
               class="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
             />
           </div>
+
+          <!-- Delete Section -->
+          <div class="border-t border-white/10 pt-6">
+            <div class="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+              <h4 class="text-sm font-medium text-red-400 mb-2">Danger Zone</h4>
+              <p class="text-xs text-gray-400 mb-3">Deleting this activity cannot be undone. All participants will be notified.</p>
+              
+              <div v-if="!showDeleteConfirm">
+                <button
+                  @click="showDeleteConfirm = true"
+                  class="px-4 py-2 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg hover:bg-red-500/20 transition-all text-sm cursor-pointer"
+                >
+                  Delete Activity
+                </button>
+              </div>
+              
+              <div v-else class="flex items-center gap-3">
+                <p class="text-sm text-red-400">Are you sure?</p>
+                <button
+                  @click="handleDelete"
+                  class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-all text-sm cursor-pointer"
+                >
+                  Yes, Delete
+                </button>
+                <button
+                  @click="showDeleteConfirm = false"
+                  class="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-all text-sm cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Footer -->
@@ -437,16 +496,16 @@ getCurrentLocation()
             Cancel
           </button>
           <button
-            @click="handleCreate"
-            :disabled="!isValid || isCreating"
+            @click="handleUpdate"
+            :disabled="!isValid || isSaving"
             :class="[
               'px-6 py-3 rounded-xl font-medium transition-all cursor-pointer',
-              isValid && !isCreating
+              isValid && !isSaving
                 ? 'bg-primary-500 text-white hover:bg-primary-600'
                 : 'bg-slate-800 text-gray-500 cursor-not-allowed'
             ]"
           >
-            {{ isCreating ? 'Creating...' : 'Create Activity' }}
+            {{ isSaving ? 'Saving...' : 'Save Changes' }}
           </button>
         </div>
       </div>

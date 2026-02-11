@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
 import ActivityCard from './ActivityCard.vue'
+import EditActivityModal from '../modals/EditActivityModal.vue'
 import activityService from '@/services/activityService'
 import { useAuthStore } from '@/stores/auth'
 import type { Activity } from '@/types'
@@ -12,6 +13,11 @@ const isLoading = ref(true)
 const page = ref(1)
 const hasMore = ref(false)
 const isLoadingMore = ref(false)
+
+// Edit modal state
+const showEditModal = ref(false)
+const selectedActivity = ref<Activity | null>(null)
+const isSaving = ref(false)
 
 // Filters
 const selectedType = ref<string>('all')
@@ -127,8 +133,56 @@ const handleLeave = async (activity: Activity) => {
 }
 
 const handleViewDetails = (activity: Activity) => {
-  // TODO: Navigate to activity details page or open modal
-  console.log('View activity details:', activity)
+  console.log('Manage button clicked for activity:', activity.title)
+  console.log('Setting selectedActivity and showing modal')
+  selectedActivity.value = activity
+  showEditModal.value = true
+  console.log('showEditModal:', showEditModal.value, 'selectedActivity:', selectedActivity.value)
+}
+
+const handleUpdateActivity = async (updatedData: any) => {
+  if (!selectedActivity.value) return
+  
+  try {
+    isSaving.value = true
+    const { data } = await activityService.updateActivity(selectedActivity.value._id, updatedData)
+    
+    if (data.success && data.activity) {
+      // Update the activity in the list
+      const index = activities.value.findIndex(a => a._id === selectedActivity.value?._id)
+      if (index !== -1) {
+        activities.value[index] = data.activity
+      }
+      showEditModal.value = false
+      selectedActivity.value = null
+    }
+  } catch (error: any) {
+    console.error('Failed to update activity:', error)
+    alert(error.response?.data?.message || 'Failed to update activity')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const handleDeleteActivity = async () => {
+  if (!selectedActivity.value) return
+  
+  try {
+    isSaving.value = true
+    const { data } = await activityService.deleteActivity(selectedActivity.value._id)
+    
+    if (data.success) {
+      // Remove the activity from the list
+      activities.value = activities.value.filter(a => a._id !== selectedActivity.value?._id)
+      showEditModal.value = false
+      selectedActivity.value = null
+    }
+  } catch (error: any) {
+    console.error('Failed to delete activity:', error)
+    alert(error.response?.data?.message || 'Failed to delete activity')
+  } finally {
+    isSaving.value = false
+  }
 }
 
 // Watch for filter changes
@@ -243,5 +297,16 @@ defineExpose({
         <p class="text-gray-400 mb-6">You haven't created any activities. Start by creating your first one!</p>
       </div>
     </div>
+
+    <!-- Edit Activity Modal -->
+    <EditActivityModal
+      v-if="selectedActivity"
+      :show="showEditModal"
+      :activity="selectedActivity"
+      :is-saving="isSaving"
+      @close="showEditModal = false; selectedActivity = null"
+      @update="handleUpdateActivity"
+      @delete="handleDeleteActivity"
+    />
   </div>
 </template>

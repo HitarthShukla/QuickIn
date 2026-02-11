@@ -72,7 +72,7 @@ const formatDate = (dateString: string) => {
 // Reaction functionality
 const getUserReaction = (post: Post) => {
   if (!authStore.user?._id) return null
-  return post.reactions.find(r => r.user === authStore.user._id)
+  return post.reactions.find(r => r.user === authStore.user!._id)
 }
 
 const getReactionIcon = (type: string) => {
@@ -91,7 +91,7 @@ const handleReaction = async (post: Post, type: string = 'like') => {
   if (!authStore.user?._id) return
 
   // Optimistic update
-  const userId = authStore.user._id
+  const userId = authStore.user!._id
   const existingReaction = getUserReaction(post)
   const originalReactions = [...post.reactions]
 

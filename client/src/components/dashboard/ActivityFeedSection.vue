@@ -216,6 +216,7 @@ defineExpose({
         v-for="activity in activities"
         :key="activity._id"
         :activity="activity"
+        :show-manage-button="false"
         @join="handleJoin(activity)"
         @leave="handleLeave(activity)"
         @view-details="handleViewDetails(activity)"

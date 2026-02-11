@@ -4,12 +4,13 @@ import { useRouter, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import LeftSidebar from '@/components/dashboard/LeftSidebar.vue'
 import ActivityFeedSection from '@/components/dashboard/ActivityFeedSection.vue'
+import MapView from '@/components/dashboard/MapView.vue'
 import RightSidebar from '@/components/dashboard/RightSidebar.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import LocationBlocker from '@/components/common/LocationBlocker.vue'
 import CreateActivityModal from '@/components/modals/CreateActivityModal.vue'
 import activityService from '@/services/activityService'
-import type { CreateActivityPayload } from '@/types'
+import type { CreateActivityPayload, Activity } from '@/types'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -20,6 +21,13 @@ const showCreateActivityModal = ref(false)
 const activityKey = ref(0)
 const isCreatingActivity = ref(false)
 const activeView = ref<'activities' | 'map'>('activities')
+const mapFilters = ref({
+  type: 'all',
+  time: 'all',
+  status: 'open'
+})
+const selectedActivity = ref<Activity | null>(null)
+const showActivityDetailsModal = ref(false)
 
 // Data from API (empty by default)
 
@@ -56,6 +64,13 @@ const handleCreateActivity = async (payload: CreateActivityPayload) => {
   } finally {
     isCreatingActivity.value = false
   }
+}
+
+const handleViewActivityFromMap = (activity: Activity) => {
+  // Switch to activities view and highlight the selected activity
+  activeView.value = 'activities'
+  // Optionally scroll to the activity or open a modal
+  console.log('Viewing activity:', activity)
 }
 
 const initials = computed(() => {
@@ -140,17 +155,13 @@ const initials = computed(() => {
               <ActivityFeedSection :key="activityKey" />
             </div>
 
-            <!-- Map View (Empty for now) -->
-            <div v-else-if="activeView === 'map'" class="bg-slate-900/50 backdrop-blur-xl border border-white/10 rounded-2xl p-12">
-              <div class="text-center">
-                <div class="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary-500/20 to-secondary-500/20 border border-primary-500/30 flex items-center justify-center">
-                  <svg class="w-10 h-10 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                  </svg>
-                </div>
-                <h3 class="text-xl font-bold text-white mb-2">Map View Coming Soon</h3>
-                <p class="text-gray-400">Interactive map with nearby activities will be available here</p>
-              </div>
+            <!-- Map View -->
+            <div v-else-if="activeView === 'map'">
+              <MapView 
+                :key="activityKey"
+                :filters="mapFilters" 
+                @view-activity="handleViewActivityFromMap"
+              />
             </div>
           </div>
 

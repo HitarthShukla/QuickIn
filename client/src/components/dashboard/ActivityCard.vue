@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   activity: Activity
+  showManageButton?: boolean
 }>()
 
 const emit = defineEmits(['join', 'leave', 'view-details'])
@@ -204,9 +205,9 @@ const getInitials = (name: string) => {
         
         <div class="flex items-center gap-2">
           <button
-            v-if="isCreator"
+            v-if="isCreator && showManageButton !== false"
             class="px-4 py-2 bg-slate-700 text-white rounded-xl hover:bg-slate-600 transition-all text-sm font-medium cursor-pointer"
-            @click="$emit('view-details')"
+            @click="$emit('view-details', activity)"
           >
             Manage
           </button>

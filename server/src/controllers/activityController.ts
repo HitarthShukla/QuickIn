@@ -374,6 +374,75 @@ export const updateActivityStatus = async (req: Request, res: Response): Promise
     }
 }
 
+// @desc    Update activity
+// @route   PUT /api/activities/:id
+// @access  Private (Creator only)
+export const updateActivity = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const activity = await Activity.findById(req.params.id)
+
+        if (!activity) {
+            res.status(404).json({
+                success: false,
+                message: 'Activity not found',
+            })
+            return
+        }
+
+        // Only creator can update
+        if (activity.creator.toString() !== req.userId) {
+            res.status(403).json({
+                success: false,
+                message: 'Only the creator can update this activity',
+            })
+            return
+        }
+
+        const { 
+            title, 
+            description, 
+            type, 
+            location, 
+            dateTime, 
+            duration,
+            maxParticipants,
+            interests,
+            requirements,
+            image 
+        } = req.body
+
+        // Update fields if provided
+        if (title) activity.title = title
+        if (description) activity.description = description
+        if (type) activity.type = type
+        if (location) activity.location = location
+        if (dateTime) activity.dateTime = dateTime
+        if (duration) activity.duration = duration
+        if (maxParticipants) activity.maxParticipants = maxParticipants
+        if (interests) activity.interests = interests
+        if (requirements) activity.requirements = requirements
+        if (image !== undefined) activity.image = image
+
+        await activity.save()
+
+        const updatedActivity = await Activity.findById(activity._id)
+            .populate('creator', 'name avatar trustScore badges')
+            .populate('participants', 'name avatar')
+
+        res.status(200).json({
+            success: true,
+            message: 'Activity updated successfully',
+            activity: updatedActivity,
+        })
+    } catch (error: any) {
+        console.error('Update activity error:', error)
+        res.status(500).json({
+            success: false,
+            message: error.message || 'Server error while updating activity',
+        })
+    }
+}
+
 // @desc    Delete activity
 // @route   DELETE /api/activities/:id
 // @access  Private (Creator only)

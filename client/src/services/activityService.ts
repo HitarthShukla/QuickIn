@@ -43,6 +43,10 @@ class ActivityService {
         return api.patch<ActivityResponse>(`/activities/${id}/status`, { status })
     }
 
+    async updateActivity(id: string, payload: Partial<CreateActivityPayload>) {
+        return api.put<ActivityResponse>(`/activities/${id}`, payload)
+    }
+
     async deleteActivity(id: string) {
         return api.delete(`/activities/${id}`)
     }
