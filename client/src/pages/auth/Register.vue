@@ -33,21 +33,43 @@ const passwordsMatch = computed(() =>
 const passwordStrength = computed(() => {
   const password = form.value.password
   if (password.length === 0) return { level: 0, text: '', color: '' }
-  if (password.length < 6) return { level: 1, text: 'Weak', color: 'bg-red-500' }
-  if (password.length < 8) return { level: 2, text: 'Fair', color: 'bg-yellow-500' }
-  if (password.length >= 8 && /[A-Z]/.test(password) && /[0-9]/.test(password)) {
+  if (password.length < 8) return { level: 1, text: 'Weak', color: 'bg-red-500' }
+  
+  const hasUpperCase = /[A-Z]/.test(password)
+  const hasLowerCase = /[a-z]/.test(password)
+  const hasNumber = /[0-9]/.test(password)
+  const hasSpecial = /[@$!%*?&]/.test(password)
+  
+  const strength = [hasUpperCase, hasLowerCase, hasNumber, hasSpecial].filter(Boolean).length
+  
+  if (strength === 4) {
     return { level: 4, text: 'Strong', color: 'bg-green-500' }
   }
-  return { level: 3, text: 'Good', color: 'bg-blue-500' }
+  if (strength === 3) {
+    return { level: 3, text: 'Good', color: 'bg-blue-500' }
+  }
+  return { level: 2, text: 'Fair', color: 'bg-yellow-500' }
 })
 
-const isFormValid = computed(() => 
-  form.value.name.length >= 2 &&
-  form.value.email.includes('@') &&
-  form.value.password.length >= 6 &&
-  passwordsMatch.value &&
-  agreedToTerms.value
-)
+const isFormValid = computed(() => {
+  const password = form.value.password
+  const hasUpperCase = /[A-Z]/.test(password)
+  const hasLowerCase = /[a-z]/.test(password)
+  const hasNumber = /[0-9]/.test(password)
+  const hasSpecial = /[@$!%*?&]/.test(password)
+  
+  return (
+    form.value.name.length >= 2 &&
+    form.value.email.includes('@') &&
+    password.length >= 8 &&
+    hasUpperCase &&
+    hasLowerCase &&
+    hasNumber &&
+    hasSpecial &&
+    passwordsMatch.value &&
+    agreedToTerms.value
+  )
+})
 
 const handleSubmit = async () => {
   authStore.clearError()
@@ -198,11 +220,45 @@ const handleSubmit = async () => {
                   </button>
                 </div>
                 <!-- Password Strength -->
-                <div v-if="form.password" class="mt-2">
+                <div v-if="form.password" class="mt-2 space-y-2">
                   <div class="flex gap-1 mb-1">
                     <div v-for="i in 4" :key="i" class="h-1 flex-1 rounded-full transition-colors" :class="i <= passwordStrength.level ? passwordStrength.color : 'bg-gray-700'"></div>
                   </div>
-                  <p class="text-xs" :class="passwordStrength.color.replace('bg-', 'text-')">{{ passwordStrength.text }}</p>
+                  <p class="text-xs font-semibold" :class="passwordStrength.color.replace('bg-', 'text-')">Strength: {{ passwordStrength.text }}</p>
+                  
+                  <!-- Password Requirements Checklist -->
+                  <div class="text-xs space-y-1 mt-2 p-2 bg-gray-800/30 rounded">
+                    <div class="flex items-center gap-2" :class="form.password.length >= 8 ? 'text-green-400' : 'text-gray-500'">
+                      <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                      <span>At least 8 characters</span>
+                    </div>
+                    <div class="flex items-center gap-2" :class="/[A-Z]/.test(form.password) ? 'text-green-400' : 'text-gray-500'">
+                      <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                      <span>One uppercase letter (A-Z)</span>
+                    </div>
+                    <div class="flex items-center gap-2" :class="/[a-z]/.test(form.password) ? 'text-green-400' : 'text-gray-500'">
+                      <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                      <span>One lowercase letter (a-z)</span>
+                    </div>
+                    <div class="flex items-center gap-2" :class="/[0-9]/.test(form.password) ? 'text-green-400' : 'text-gray-500'">
+                      <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                      <span>One number (0-9)</span>
+                    </div>
+                    <div class="flex items-center gap-2" :class="/[@$!%*?&]/.test(form.password) ? 'text-green-400' : 'text-gray-500'">
+                      <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                      <span>One special character (@$!%*?&)</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 

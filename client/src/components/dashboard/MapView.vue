@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { LMap, LTileLayer, LMarker, LPopup, LIcon } from '@vue-leaflet/vue-leaflet'
 import 'leaflet/dist/leaflet.css'
+import SendJoinRequestModal from '../modals/SendJoinRequestModal.vue'
 import activityService from '@/services/activityService'
+import joinRequestService from '@/services/joinRequestService'
 import type { Activity } from '@/types'
 import { useAuthStore } from '@/stores/auth'
+import socketService from '@/services/socketService'
 
 const authStore = useAuthStore()
 const user = computed(() => authStore.user)
@@ -28,6 +31,12 @@ const activities = ref<Activity[]>([])
 const isLoading = ref(true)
 const selectedActivity = ref<Activity | null>(null)
 const currentSlideIndex = ref<Record<string, number>>({}) // Track slide index per location
+
+// Join request modal state
+const showJoinRequestModal = ref(false)
+const selectedActivityForRequest = ref<Activity | null>(null)
+const isSendingRequest = ref(false)
+const sentRequests = ref<Set<string>>(new Set()) // Track activities user has sent requests for
 
 // Activity type configurations
 const activityTypeConfig: Record<string, { icon: string; color: string }> = {
@@ -204,6 +213,13 @@ const handleViewDetails = () => {
 }
 
 const handleJoinActivity = async (activity: Activity) => {
+  // Check if activity requires join request
+  if (activity.joinType === 'request') {
+    selectedActivityForRequest.value = activity
+    showJoinRequestModal.value = true
+    return
+  }
+
   try {
     const { data } = await activityService.joinActivity(activity._id)
     if (data.success) {
@@ -213,7 +229,37 @@ const handleJoinActivity = async (activity: Activity) => {
     }
   } catch (error: any) {
     console.error('Failed to join activity:', error)
-    alert(error.response?.data?.message || 'Failed to join activity')
+    if (error.response?.data?.requiresRequest) {
+      // Activity requires join request
+      selectedActivityForRequest.value = activity
+      showJoinRequestModal.value = true
+    } else {
+      alert(error.response?.data?.message || 'Failed to join activity')
+    }
+  }
+}
+
+const handleSendJoinRequest = async (message: string) => {
+  if (!selectedActivityForRequest.value) return
+
+  try {
+    isSendingRequest.value = true
+    const { data } = await joinRequestService.sendJoinRequest(
+      selectedActivityForRequest.value._id,
+      message
+    )
+
+    if (data.success) {
+      sentRequests.value.add(selectedActivityForRequest.value._id)
+      alert('Join request sent successfully!')
+      showJoinRequestModal.value = false
+      selectedActivityForRequest.value = null
+    }
+  } catch (error: any) {
+    console.error('Failed to send join request:', error)
+    alert(error.response?.data?.message || 'Failed to send join request')
+  } finally {
+    isSendingRequest.value = false
   }
 }
 
@@ -257,6 +303,27 @@ watch(() => props.filters, () => {
 
 onMounted(() => {
   fetchActivities()
+
+  socketService.connect()
+  socketService.on('activity:created', () => fetchActivities())
+  socketService.on('activity:updated', () => fetchActivities())
+  socketService.on('activity:deleted', () => fetchActivities())
+  socketService.on('activity:participant-joined', () => fetchActivities())
+  socketService.on('activity:participant-left', () => fetchActivities())
+  
+  // Join request events
+  socketService.on('activity:join-request:sent', ({ activityId }) => {
+    sentRequests.value.add(activityId)
+  })
+  
+  socketService.on('activity:join-request:accepted', ({ activityId }) => {
+    sentRequests.value.delete(activityId)
+    fetchActivities()
+  })
+  
+  socketService.on('activity:join-request:rejected', ({ activityId }) => {
+    sentRequests.value.delete(activityId)
+  })
   
   // Try to get user's current location
   if (navigator.geolocation) {
@@ -270,6 +337,17 @@ onMounted(() => {
       }
     )
   }
+})
+
+onUnmounted(() => {
+  socketService.off('activity:created')
+  socketService.off('activity:updated')
+  socketService.off('activity:deleted')
+  socketService.off('activity:participant-joined')
+  socketService.off('activity:participant-left')
+  socketService.off('activity:join-request:sent')
+  socketService.off('activity:join-request:accepted')
+  socketService.off('activity:join-request:rejected')
 })
 
 // Expose refresh method
@@ -425,6 +503,15 @@ defineExpose({
       </p>
     </div>
   </div>
+
+  <!-- Join Request Modal -->
+  <SendJoinRequestModal 
+    v-if="showJoinRequestModal && selectedActivityForRequest"
+    :activity="selectedActivityForRequest"
+    :is-sending="isSendingRequest"
+    @close="showJoinRequestModal = false; selectedActivityForRequest = null"
+    @send="handleSendJoinRequest"
+  />
 </template>
 
 <style>

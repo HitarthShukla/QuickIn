@@ -11,6 +11,7 @@ const ResetPassword = () => import('@/pages/auth/ResetPassword.vue')
 const Dashboard = () => import('@/pages/Dashboard.vue')
 const Activities = () => import('@/pages/Activities.vue')
 const Profile = () => import('@/pages/Profile.vue')
+const Messages = () => import('@/pages/Messages.vue')
 
 const routes: RouteRecordRaw[] = [
     {
@@ -64,6 +65,12 @@ const routes: RouteRecordRaw[] = [
         path: '/profile',
         name: 'profile',
         component: Profile,
+        meta: { requiresAuth: true },
+    },
+    {
+        path: '/messages',
+        name: 'messages',
+        component: Messages,
         meta: { requiresAuth: true },
     },
     {

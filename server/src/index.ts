@@ -4,12 +4,15 @@ import { createServer } from 'http'
 import cors from 'cors'
 import helmet from 'helmet'
 import morgan from 'morgan'
+import path from 'path'
 
 import connectDB from './config/db.js'
 import authRoutes from './routes/auth.js'
 import postRoutes from './routes/posts.js'
 import activityRoutes from './routes/activities.js'
 import { initializeSocket } from './socket/index.js'
+import { setSocketServer } from './socket/server.js'
+import chatRoutes from './routes/chats.js'
 
 // Initialize Express
 const app = express()
@@ -20,6 +23,7 @@ connectDB()
 
 // Initialize Socket.IO
 const io = initializeSocket(httpServer)
+setSocketServer(io)
 
 // Make io accessible to routes if needed
 app.set('io', io)
@@ -35,10 +39,14 @@ app.use(morgan('dev'))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))
+
 // Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/posts', postRoutes)
 app.use('/api/activities', activityRoutes)
+app.use('/api/chats', chatRoutes)
 
 // Health check
 app.get('/api/health', (_req, res) => {

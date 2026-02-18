@@ -1,6 +1,7 @@
 import { Server as SocketIOServer } from 'socket.io'
 import { Server as HttpServer } from 'http'
 import { verifyToken } from '../utils/jwt.js'
+import ActivityChat from '../models/ActivityChat.js'
 
 export const initializeSocket = (httpServer: HttpServer): SocketIOServer => {
     const io = new SocketIOServer(httpServer, {
@@ -35,6 +36,18 @@ export const initializeSocket = (httpServer: HttpServer): SocketIOServer => {
         // Join user to their personal room
         socket.join(`user:${socket.data.userId}`)
 
+        // Join all activity chat rooms for this user
+        ActivityChat.find({ participants: socket.data.userId })
+            .select('_id')
+            .then((chats) => {
+                chats.forEach((chat) => {
+                    socket.join(`activity-chat:${chat._id.toString()}`)
+                })
+            })
+            .catch((error) => {
+                console.error('Failed to join activity chat rooms:', error)
+            })
+
         // Handle joining a room/group
         socket.on('join:room', (roomId: string) => {
             socket.join(`room:${roomId}`)
@@ -45,6 +58,22 @@ export const initializeSocket = (httpServer: HttpServer): SocketIOServer => {
         socket.on('leave:room', (roomId: string) => {
             socket.leave(`room:${roomId}`)
             console.log(`User ${socket.data.userId} left room: ${roomId}`)
+        })
+
+        // Join activity chat room by activity id
+        socket.on('activity:chat:join', async (activityId: string) => {
+            try {
+                const chat = await ActivityChat.findOne({
+                    activity: activityId,
+                    participants: socket.data.userId,
+                }).select('_id')
+
+                if (chat) {
+                    socket.join(`activity-chat:${chat._id.toString()}`)
+                }
+            } catch (error) {
+                console.error('Join activity chat room error:', error)
+            }
         })
 
         // Handle chat messages

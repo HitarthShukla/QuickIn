@@ -81,6 +81,7 @@ export interface Activity {
     description: string
     type: ActivityType
     status: ActivityStatus
+    joinType: 'open' | 'request'
     location: ActivityLocation
     dateTime: string
     duration?: number
@@ -97,6 +98,7 @@ export interface CreateActivityPayload {
     title: string
     description: string
     type: ActivityType
+    joinType?: 'open' | 'request'
     location: {
         type: 'Point'
         coordinates: [number, number]
@@ -128,3 +130,88 @@ export interface ActivityResponse {
     activity: Activity
 }
 
+export interface ActivityChat {
+    _id: string
+    activity: {
+        _id: string
+        title: string
+        status: ActivityStatus
+        dateTime: string
+    }
+    title: string
+    participants: User[]
+    lastMessage?: {
+        sender: string
+        content: string
+        createdAt: string
+    }
+    createdAt: string
+    updatedAt: string
+}
+
+export interface ActivityChatMessage {
+    _id: string
+    chat: string
+    activity: string
+    sender: User
+    messageType: 'text' | 'voice' | 'image'
+    content?: string
+    fileUrl?: string
+    fileName?: string
+    fileSize?: number
+    duration?: number
+    createdAt: string
+    updatedAt: string
+}
+
+export interface ActivityChatsResponse {
+    success: boolean
+    count: number
+    chats: ActivityChat[]
+}
+
+export interface ActivityChatMessagesResponse {
+    success: boolean
+    chat: ActivityChat
+    count: number
+    messages: ActivityChatMessage[]
+}
+
+export interface ActivityChatSendMessageResponse {
+    success: boolean
+    message: ActivityChatMessage
+}
+
+export interface UploadChatFileResponse {
+    success: boolean
+    fileUrl: string
+    fileName: string
+    fileSize: number
+    messageType: 'voice' | 'image'
+}
+
+export interface JoinRequest {
+    _id: string
+    activity: Activity | string
+    user: User
+    message?: string
+    status: 'pending' | 'accepted' | 'rejected'
+    createdAt: string
+    updatedAt: string
+}
+
+export interface SendJoinRequestPayload {
+    message?: string
+}
+
+export interface JoinRequestsResponse {
+    success: boolean
+    count: number
+    requests: JoinRequest[]
+}
+
+export interface JoinRequestResponse {
+    success: boolean
+    message: string
+    request?: JoinRequest
+}

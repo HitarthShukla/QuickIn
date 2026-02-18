@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose'
 
 export type ActivityType = 'sport' | 'movie' | 'gaming' | 'study' | 'food' | 'event' | 'hangout' | 'other'
 export type ActivityStatus = 'open' | 'in-progress' | 'completed' | 'cancelled'
+export type JoinType = 'open' | 'request'
 
 export interface IActivity extends Document {
     _id: mongoose.Types.ObjectId
@@ -10,6 +11,7 @@ export interface IActivity extends Document {
     description: string
     type: ActivityType
     status: ActivityStatus
+    joinType: JoinType
     location: {
         type: 'Point'
         coordinates: [number, number] // [longitude, latitude]
@@ -55,6 +57,11 @@ const activitySchema = new Schema<IActivity>(
         status: {
             type: String,
             enum: ['open', 'in-progress', 'completed', 'cancelled'],
+            default: 'open',
+        },
+        joinType: {
+            type: String,
+            enum: ['open', 'request'],
             default: 'open',
         },
         location: {

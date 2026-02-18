@@ -1,5 +1,13 @@
 import { Request, Response } from 'express'
 import Activity from '../models/Activity.js'
+import {
+    addParticipantToActivityChat,
+    deleteActivityChat,
+    ensureActivityChat,
+    removeParticipantFromActivityChat,
+    renameActivityChat,
+} from '../services/activityChatService.js'
+import { getSocketServer } from '../socket/server.js'
 
 // @desc    Create new activity
 // @route   POST /api/activities
@@ -16,7 +24,8 @@ export const createActivity = async (req: Request, res: Response): Promise<void>
             maxParticipants,
             interests,
             requirements,
-            image 
+            image,
+            joinType
         } = req.body
 
         const activity = await Activity.create({
@@ -32,12 +41,22 @@ export const createActivity = async (req: Request, res: Response): Promise<void>
             interests,
             requirements,
             image,
+            joinType: joinType || 'open',
             status: 'open'
         })
 
         const populatedActivity = await Activity.findById(activity._id)
             .populate('creator', 'name avatar trustScore')
             .populate('participants', 'name avatar')
+
+        await ensureActivityChat(activity._id)
+
+        const io = getSocketServer()
+        if (io && populatedActivity) {
+            io.emit('activity:created', {
+                activity: populatedActivity,
+            })
+        }
 
         res.status(201).json({
             success: true,
@@ -220,6 +239,16 @@ export const joinActivity = async (req: Request, res: Response): Promise<void> =
             return
         }
 
+        // Check if activity requires join request
+        if (activity.joinType === 'request') {
+            res.status(400).json({
+                success: false,
+                message: 'This activity requires a join request. Please send a join request instead.',
+                requiresRequest: true,
+            })
+            return
+        }
+
         // Check if activity is full
         if (activity.participants.length >= activity.maxParticipants) {
             res.status(400).json({
@@ -250,10 +279,22 @@ export const joinActivity = async (req: Request, res: Response): Promise<void> =
         // Add user to participants
         activity.participants.push(req.userId as any)
         await activity.save()
+        await addParticipantToActivityChat(activity._id, req.userId as string)
 
         const updatedActivity = await Activity.findById(activity._id)
             .populate('creator', 'name avatar trustScore badges')
             .populate('participants', 'name avatar')
+
+        const io = getSocketServer()
+        if (io && updatedActivity) {
+            io.emit('activity:participant-joined', {
+                activity: updatedActivity,
+                userId: req.userId,
+            })
+            io.emit('activity:updated', {
+                activity: updatedActivity,
+            })
+        }
 
         res.status(200).json({
             success: true,
@@ -309,10 +350,22 @@ export const leaveActivity = async (req: Request, res: Response): Promise<void> 
         // Remove user from participants
         activity.participants.splice(participantIndex, 1)
         await activity.save()
+        await removeParticipantFromActivityChat(activity._id, req.userId as string)
 
         const updatedActivity = await Activity.findById(activity._id)
             .populate('creator', 'name avatar trustScore badges')
             .populate('participants', 'name avatar')
+
+        const io = getSocketServer()
+        if (io && updatedActivity) {
+            io.emit('activity:participant-left', {
+                activity: updatedActivity,
+                userId: req.userId,
+            })
+            io.emit('activity:updated', {
+                activity: updatedActivity,
+            })
+        }
 
         res.status(200).json({
             success: true,
@@ -359,6 +412,13 @@ export const updateActivityStatus = async (req: Request, res: Response): Promise
         const updatedActivity = await Activity.findById(activity._id)
             .populate('creator', 'name avatar trustScore badges')
             .populate('participants', 'name avatar')
+
+        const io = getSocketServer()
+        if (io && updatedActivity) {
+            io.emit('activity:updated', {
+                activity: updatedActivity,
+            })
+        }
 
         res.status(200).json({
             success: true,
@@ -424,10 +484,18 @@ export const updateActivity = async (req: Request, res: Response): Promise<void>
         if (image !== undefined) activity.image = image
 
         await activity.save()
+        await renameActivityChat(activity._id, activity.title)
 
         const updatedActivity = await Activity.findById(activity._id)
             .populate('creator', 'name avatar trustScore badges')
             .populate('participants', 'name avatar')
+
+        const io = getSocketServer()
+        if (io && updatedActivity) {
+            io.emit('activity:updated', {
+                activity: updatedActivity,
+            })
+        }
 
         res.status(200).json({
             success: true,
@@ -468,6 +536,14 @@ export const deleteActivity = async (req: Request, res: Response): Promise<void>
         }
 
         await Activity.findByIdAndDelete(req.params.id)
+        await deleteActivityChat(activity._id)
+
+        const io = getSocketServer()
+        if (io) {
+            io.emit('activity:deleted', {
+                activityId: activity._id.toString(),
+            })
+        }
 
         res.status(200).json({
             success: true,

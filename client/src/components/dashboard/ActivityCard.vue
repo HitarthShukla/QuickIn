@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 const props = defineProps<{
   activity: Activity
   showManageButton?: boolean
+  hasPendingRequest?: boolean
 }>()
 
 const emit = defineEmits(['join', 'leave', 'view-details'])
@@ -219,11 +220,23 @@ const getInitials = (name: string) => {
             Leave
           </button>
           <button
+            v-else-if="hasPendingRequest"
+            class="px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 rounded-xl cursor-not-allowed text-sm font-medium"
+            disabled
+          >
+            ⏳ Request Pending
+          </button>
+          <button
             v-else-if="activity.status === 'open' && !isFull"
-            class="px-4 py-2 bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-all text-sm font-medium cursor-pointer"
+            :class="[
+              'px-4 py-2 rounded-xl transition-all text-sm font-medium cursor-pointer',
+              activity.joinType === 'request'
+                ? 'bg-blue-500 text-white hover:bg-blue-600'
+                : 'bg-primary-500 text-white hover:bg-primary-600'
+            ]"
             @click="$emit('join')"
           >
-            Join Activity
+            {{ activity.joinType === 'request' ? 'Request to Join' : 'Join Activity' }}
           </button>
           <button
             v-else

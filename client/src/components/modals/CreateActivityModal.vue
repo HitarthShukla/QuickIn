@@ -15,6 +15,7 @@ const type = ref<ActivityType>('hangout')
 const dateTime = ref('')
 const duration = ref<number>(60)
 const maxParticipants = ref<number>(5)
+const joinType = ref<'open' | 'request'>('open')
 const location = ref({
   placeName: '',
   address: '',
@@ -174,6 +175,7 @@ const handleCreate = () => {
     title: title.value,
     description: description.value,
     type: type.value,
+    joinType: joinType.value,
     location: {
       type: 'Point' as const,
       coordinates: location.value.coordinates,
@@ -379,6 +381,53 @@ getCurrentLocation()
               max="100"
               class="w-full bg-slate-800 border border-white/10 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
             />
+          </div>
+
+          <!-- Join Type -->
+          <div>
+            <label class="block text-sm font-medium text-gray-300 mb-3">Join Type *</label>
+            <div class="flex gap-4">
+              <button
+                type="button"
+                @click="joinType = 'open'"
+                :class="[
+                  'flex-1 px-4 py-3 rounded-xl border-2 transition-all text-left',
+                  joinType === 'open'
+                    ? 'border-primary-500 bg-primary-500/10 text-white'
+                    : 'border-white/10 bg-slate-800 text-gray-400 hover:border-white/20'
+                ]"
+              >
+                <div class="flex items-center gap-2">
+                  <svg class="w-5 h-5" :class="joinType === 'open' ? 'text-primary-400' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                  </svg>
+                  <div>
+                    <p class="font-medium">Open</p>
+                    <p class="text-xs opacity-70">Anyone can join directly</p>
+                  </div>
+                </div>
+              </button>
+              <button
+                type="button"
+                @click="joinType = 'request'"
+                :class="[
+                  'flex-1 px-4 py-3 rounded-xl border-2 transition-all text-left',
+                  joinType === 'request'
+                    ? 'border-primary-500 bg-primary-500/10 text-white'
+                    : 'border-white/10 bg-slate-800 text-gray-400 hover:border-white/20'
+                ]"
+              >
+                <div class="flex items-center gap-2">
+                  <svg class="w-5 h-5" :class="joinType === 'request' ? 'text-primary-400' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <div>
+                    <p class="font-medium">Request to Join</p>
+                    <p class="text-xs opacity-70">Approval required</p>
+                  </div>
+                </div>
+              </button>
+            </div>
           </div>
 
           <!-- Interests/Tags -->

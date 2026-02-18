@@ -380,6 +380,52 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
     }
 }
 
+// @desc    Get user profile by ID (public profile for authenticated users)
+// @route   GET /api/auth/users/:id
+// @access  Private
+export const getUserProfileById = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const user = await User.findById(req.params.id)
+
+        if (!user) {
+            res.status(404).json({
+                success: false,
+                message: 'User not found',
+            })
+            return
+        }
+
+        res.json({
+            success: true,
+            user: {
+                _id: user._id,
+                name: user.name,
+                avatar: user.avatar,
+                coverPhoto: user.coverPhoto,
+                bio: user.bio,
+                activeZones: user.activeZones,
+                trustScore: user.trustScore,
+                attendanceRate: user.attendanceRate,
+                totalActivities: user.totalActivities,
+                badges: user.badges,
+                interests: user.interests,
+                availabilityStatus: user.availabilityStatus,
+                languages: user.languages,
+                isEmailVerified: user.isEmailVerified,
+                isVerifiedStudent: user.isVerifiedStudent,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt,
+            },
+        })
+    } catch (error) {
+        console.error('Get user profile by ID error:', error)
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
+        })
+    }
+}
+
 // @desc    Update user profile
 // @route   PUT /api/auth/profile
 // @access  Private

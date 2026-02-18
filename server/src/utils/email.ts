@@ -10,7 +10,7 @@ interface EmailOptions {
 const createTransporter = () => {
     // Use Gmail if credentials provided
     if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
-        console.log('Using Gmail SMTP for email')
+        console.log('✉️  Using Gmail SMTP for email')
         return nodemailer.createTransport({
             service: 'gmail',
             auth: {
@@ -22,6 +22,7 @@ const createTransporter = () => {
 
     // Production SMTP fallback
     if (process.env.NODE_ENV === 'production' && process.env.SMTP_HOST) {
+        console.log('✉️  Using SMTP server for email')
         return nodemailer.createTransport({
             host: process.env.SMTP_HOST,
             port: parseInt(process.env.SMTP_PORT || '587'),
@@ -33,16 +34,22 @@ const createTransporter = () => {
         })
     }
 
-    // Development: use ethereal.email test account
-    console.log('Using Ethereal Email for testing')
-    return nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        auth: {
-            user: process.env.ETHEREAL_USER || '',
-            pass: process.env.ETHEREAL_PASS || '',
-        },
-    })
+    // Development: use mock transporter (logs email instead of sending)
+    console.log('📧 Using Mock Email for development (emails will be logged, not sent)')
+    return {
+        sendMail: async (options: any) => {
+            console.log('\n════════════════════════════════════════')
+            console.log('📧 MOCK EMAIL SENT')
+            console.log('════════════════════════════════════════')
+            console.log(`To: ${options.to}`)
+            console.log(`Subject: ${options.subject}`)
+            console.log(`From: ${options.from}`)
+            console.log('────────────────────────────────────────')
+            console.log(options.html)
+            console.log('════════════════════════════════════════\n')
+            return { messageId: `mock-${Date.now()}@quickin.local` }
+        }
+    } as any
 }
 
 // Generate 6-digit OTP
@@ -64,16 +71,16 @@ export const sendEmail = async (options: EmailOptions): Promise<boolean> => {
 
         const info = await transporter.sendMail(mailOptions)
 
-        console.log('Email sent:', info.messageId)
-
-        // In development, log the ethereal URL
-        if (process.env.NODE_ENV !== 'production') {
-            console.log('Preview URL:', nodemailer.getTestMessageUrl(info))
-        }
+        console.log('✅ Email processed:', info.messageId)
 
         return true
     } catch (error) {
-        console.error('Email send error:', error)
+        console.error('❌ Email error:', error)
+        // In development, don't fail - just log the error
+        if (process.env.NODE_ENV === 'development') {
+            console.log('Continuing in development mode despite email error')
+            return true
+        }
         return false
     }
 }
