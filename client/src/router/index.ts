@@ -35,7 +35,6 @@ const routes: RouteRecordRaw[] = [
         path: '/verify-otp',
         name: 'verify-otp',
         component: VerifyOTP,
-        meta: { guest: true },
     },
     {
         path: '/forgot-password',

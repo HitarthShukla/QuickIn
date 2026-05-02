@@ -1,4 +1,6 @@
 import { Request, Response } from 'express'
+import speakeasy from 'speakeasy'
+import QRCode from 'qrcode'
 import User from '../models/User.js'
 import { generateToken } from '../utils/jwt.js'
 import { generateOTP, sendOTPEmail } from '../utils/email.js'
@@ -155,22 +157,11 @@ export const verifyOTP = async (req: Request, res: Response): Promise<void> => {
         user.emailVerificationExpires = undefined
         await user.save()
 
-        // Generate token
-        const token = generateToken(user)
-
         res.json({
             success: true,
-            message: 'Email verified successfully',
-            token,
-            user: {
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                avatar: user.avatar,
-                isEmailVerified: user.isEmailVerified,
-                createdAt: user.createdAt,
-                updatedAt: user.updatedAt,
-            },
+            message: 'Email verified successfully. Please set up MFA.',
+            requiresMfaSetup: true,
+            email: user.email,
         })
     } catch (error) {
         console.error('Verify OTP error:', error)
@@ -299,15 +290,201 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         // Reset failed attempts on successful login
         await user.resetLoginAttempts()
 
-        // Generate token
+        // Check if MFA is required
+        if (user.isMfaSetupComplete) {
+            res.json({
+                success: true,
+                message: 'MFA required. Please enter your authenticator code.',
+                requiresMfa: true,
+                email: user.email,
+            })
+            return
+        } else {
+            // Generate token and login user
+            const token = generateToken(user)
+
+            res.cookie('token', token, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'strict',
+                maxAge: 7 * 24 * 60 * 60 * 1000,
+            })
+
+            res.json({
+                success: true,
+                message: 'Login successful',
+                token,
+                user: {
+                    _id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    avatar: user.avatar,
+                    isEmailVerified: user.isEmailVerified,
+                    isMfaSetupComplete: user.isMfaSetupComplete,
+                    createdAt: user.createdAt,
+                    updatedAt: user.updatedAt,
+                }
+            })
+            return
+        }
+    } catch (error) {
+        console.error('Login error:', error)
+        res.status(500).json({
+            success: false,
+            message: 'Server error during login',
+        })
+    }
+}
+
+// @desc    Setup MFA
+// @route   POST /api/auth/mfa/setup
+// @access  Public
+export const setupMfa = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { email } = req.body
+        const user = await User.findOne({ email: email.toLowerCase() })
+
+        if (!user) {
+            res.status(404).json({ success: false, message: 'User not found' })
+            return
+        }
+        
+        if (user.isMfaSetupComplete) {
+            res.status(400).json({ success: false, message: 'MFA is already set up' })
+            return
+        }
+
+        // Generate secret
+        const secret = speakeasy.generateSecret({ name: `QuickIn (${user.email})` })
+        
+        user.mfaSecret = secret.base32
+        await user.save()
+
+        // Generate robust otpauth URL
+        const authUrl = speakeasy.otpauthURL({
+            secret: secret.base32,
+            label: user.email,
+            issuer: 'QuickIn',
+            encoding: 'base32'
+        })
+
+        // Generate QR code
+        QRCode.toDataURL(authUrl, (err, data_url) => {
+            if (err) {
+                res.status(500).json({ success: false, message: 'Could not generate QR code' })
+                return
+            }
+            res.json({
+                success: true,
+                qrCodeUrl: data_url,
+                secret: secret.base32
+            })
+        })
+    } catch (error) {
+        console.error('Setup MFA error:', error)
+        res.status(500).json({ success: false, message: 'Server error' })
+    }
+}
+
+// @desc    Verify MFA setup
+// @route   POST /api/auth/mfa/verify-setup
+// @access  Public
+export const verifyMfaSetup = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { email, code, token: bodyToken } = req.body
+        const mfaCode = code || bodyToken
+        const user = await User.findOne({ email: email.toLowerCase() }).select('+mfaSecret')
+
+        if (!user || (!user.mfaSecret && user.isMfaSetupComplete)) {
+            res.status(404).json({ success: false, message: 'User or secret not found' })
+            return
+        }
+
+        console.log('MFA Verification attempt:', { email, mfaCode, secret: user.mfaSecret });
+
+        const verified = speakeasy.totp.verify({
+            secret: user.mfaSecret!,
+            encoding: 'base32',
+            token: String(mfaCode).trim(),
+            window: 4
+        })
+
+        console.log('MFA Verification result:', verified);
+
+        if (!verified) {
+            res.status(400).json({ success: false, message: 'Invalid verification code' })
+            return
+        }
+
+        user.isMfaSetupComplete = true
+        await user.save()
+
+        // Generate token and login user
         const token = generateToken(user)
 
-        // Set HTTP-only cookie
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',
             maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+        })
+
+        res.json({
+            success: true,
+            message: 'MFA setup complete and mapped. Login successful',
+            token,
+            user: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                avatar: user.avatar,
+                isEmailVerified: user.isEmailVerified,
+                isMfaSetupComplete: user.isMfaSetupComplete,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt,
+            },
+        })
+
+    } catch (error) {
+        console.error('Verify MFA Setup error:', error)
+        res.status(500).json({ success: false, message: 'Server error' })
+    }
+}
+
+// @desc    Login with MFA Code
+// @route   POST /api/auth/login-mfa
+// @access  Public
+export const loginWithMfa = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { email, code, token: bodyToken } = req.body
+        const mfaCode = code || bodyToken
+        const user = await User.findOne({ email: email.toLowerCase() }).select('+mfaSecret')
+
+        if (!user || (!user.isMfaSetupComplete)) {
+            res.status(400).json({ success: false, message: 'Invalid request' })
+            return
+        }
+
+        const verified = speakeasy.totp.verify({
+            secret: user.mfaSecret!,
+            encoding: 'base32',
+            token: String(mfaCode).trim(),
+            window: 4
+        })
+
+        if (!verified) {
+            res.status(401).json({ success: false, message: 'Invalid verification code' })
+            return
+        }
+
+        // Generate token and login user
+        const token = generateToken(user)
+
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
         })
 
         res.json({
@@ -320,16 +497,50 @@ export const login = async (req: Request, res: Response): Promise<void> => {
                 email: user.email,
                 avatar: user.avatar,
                 isEmailVerified: user.isEmailVerified,
+                isMfaSetupComplete: user.isMfaSetupComplete,
                 createdAt: user.createdAt,
                 updatedAt: user.updatedAt,
-            },
+            }
         })
     } catch (error) {
-        console.error('Login error:', error)
-        res.status(500).json({
-            success: false,
-            message: 'Server error during login',
+        console.error('MFA Login error:', error)
+        res.status(500).json({ success: false, message: 'Server error' })
+    }
+}
+
+// @desc    Disable MFA
+// @route   POST /api/auth/mfa/disable
+// @access  Private
+export const disableMfa = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const user = await User.findById(req.user?._id)
+
+        if (!user) {
+            res.status(404).json({ success: false, message: 'User not found' })
+            return
+        }
+
+        user.isMfaSetupComplete = false
+        user.mfaSecret = undefined
+        await user.save()
+
+        res.json({
+            success: true,
+            message: 'MFA has been disabled successfully',
+            user: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                avatar: user.avatar,
+                isEmailVerified: user.isEmailVerified,
+                isMfaSetupComplete: user.isMfaSetupComplete,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt,
+            }
         })
+    } catch (error) {
+        console.error('Disable MFA error:', error)
+        res.status(500).json({ success: false, message: 'Server error' })
     }
 }
 
@@ -367,6 +578,7 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
                 languages: user.languages,
                 isEmailVerified: user.isEmailVerified,
                 isVerifiedStudent: user.isVerifiedStudent,
+                isMfaSetupComplete: user.isMfaSetupComplete,
                 createdAt: user.createdAt,
                 updatedAt: user.updatedAt,
             },
@@ -501,6 +713,7 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
                 languages: user.languages,
                 isEmailVerified: user.isEmailVerified,
                 isVerifiedStudent: user.isVerifiedStudent,
+                isMfaSetupComplete: user.isMfaSetupComplete,
                 createdAt: user.createdAt,
                 updatedAt: user.updatedAt,
             },

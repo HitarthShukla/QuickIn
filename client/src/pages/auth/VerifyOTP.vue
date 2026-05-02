@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute, RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { authService } from '@/services/authService'
 
 const router = useRouter()
 const route = useRoute()
@@ -15,20 +16,43 @@ const resendCooldown = ref(0)
 const errorMessage = ref('')
 const successMessage = ref('')
 
+const isSetupMfaMode = ref(false)
+const mfaSecret = ref('')
+const mfaQrCodeUrl = ref('')
+
 const isSubmitting = computed(() => authStore.loading)
 
-onMounted(() => {
+onMounted(async () => {
   email.value = (route.query.email as string) || ''
+  
+  if (route.query.setupMfa === 'true' || authStore.requiresMfaSetup) {
+    await initMfaSetup()
+  } else {
+    // Focus first input
+    setTimeout(() => {
+      const firstInput = document.querySelector('input[data-index="0"]') as HTMLInputElement
+      firstInput?.focus()
+    }, 200)
+  }
+
   setTimeout(() => {
     isLoaded.value = true
   }, 100)
-  // Focus first input
-  const firstInput = document.querySelector('input[data-index="0"]') as HTMLInputElement
-  firstInput?.focus()
 })
 
 const otpValue = computed(() => otp.value.join(''))
 const isOtpComplete = computed(() => otpValue.value.length === 6)
+
+const initMfaSetup = async () => {
+  isSetupMfaMode.value = true
+  try {
+    const data = await authService.setupMFA(email.value)
+    mfaSecret.value = data.secret
+    mfaQrCodeUrl.value = data.qrCodeUrl
+  } catch (err: any) {
+    errorMessage.value = err.response?.data?.message || 'Failed to initialize MFA setup'
+  }
+}
 
 const handleInput = (index: number, event: Event) => {
   const input = event.target as HTMLInputElement
@@ -73,9 +97,42 @@ const handleSubmit = async () => {
   })
 
   if (success) {
-    router.push('/dashboard')
+    if (authStore.requiresMfaSetup) {
+      // Clear OTP fields before showing MFA setup screen
+      otp.value = ['', '', '', '', '', '']
+      await initMfaSetup()
+      // Focus first input for MFA
+      setTimeout(() => {
+        const firstInput = document.querySelector('input[data-index="0"]') as HTMLInputElement
+        firstInput?.focus()
+      }, 100)
+    } else {
+      router.push('/dashboard')
+    }
   } else {
     errorMessage.value = authStore.error || 'Invalid verification code'
+    // Clear OTP on error
+    otp.value = ['', '', '', '', '', '']
+    const firstInput = document.querySelector('input[data-index="0"]') as HTMLInputElement
+    firstInput?.focus()
+  }
+}
+
+const handleConfirmMfa = async () => {
+  if (!isOtpComplete.value) return
+
+  errorMessage.value = ''
+  successMessage.value = ''
+
+  const success = await authStore.verifyMfaSetup({
+    email: email.value,
+    token: otpValue.value,
+  })
+
+  if (success) {
+    router.push('/dashboard')
+  } else {
+    errorMessage.value = authStore.error || 'Invalid MFA code'
     // Clear OTP on error
     otp.value = ['', '', '', '', '', '']
     const firstInput = document.querySelector('input[data-index="0"]') as HTMLInputElement
@@ -118,7 +175,7 @@ const handleResendOTP = async () => {
     </div>
 
     <!-- Verification Card -->
-    <div class="relative z-10 w-full max-w-md px-4">
+    <div :class="['relative z-10 w-full px-4 transition-all duration-500', isSetupMfaMode ? 'max-w-3xl' : 'max-w-md']">
       <div :class="['', isLoaded ? 'animate-slide-up' : 'opacity-0']">
         <!-- Logo -->
         <RouterLink to="/" class="inline-block mb-6">
@@ -132,14 +189,22 @@ const handleResendOTP = async () => {
             <!-- Header -->
             <div class="text-center mb-6">
               <div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg">
-                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg v-if="isSetupMfaMode" class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+                <svg v-else class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
               </div>
-              <h2 class="text-2xl font-bold text-white mb-2">Verify your email</h2>
+              <h2 class="text-2xl font-bold text-white mb-2">{{ isSetupMfaMode ? 'Set up Two-Factor Authentication' : 'Verify your email' }}</h2>
               <p class="text-gray-400 text-sm">
-                We've sent a 6-digit code to<br />
-                <span class="text-white font-medium">{{ email }}</span>
+                <template v-if="isSetupMfaMode">
+                  Secure your account by enabling two-factor authentication.
+                </template>
+                <template v-else>
+                  We've sent a 6-digit code to<br />
+                  <span class="text-white font-medium">{{ email }}</span>
+                </template>
               </p>
             </div>
 
@@ -162,8 +227,64 @@ const handleResendOTP = async () => {
               </div>
             </Transition>
 
+            <!-- MFA Setup UI -->
+            <div v-if="isSetupMfaMode" class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+              <!-- Left side: QR Code -->
+              <div class="flex flex-col items-center bg-white/5 rounded-2xl p-6 border border-white/10 h-full justify-center">
+                <div class="bg-white rounded-xl p-2 mb-4 shadow-xl" v-if="mfaQrCodeUrl">
+                  <img :src="mfaQrCodeUrl" alt="MFA QR Code" class="w-40 h-40" />
+                </div>
+                <div class="text-center w-full">
+                  <p class="text-xs text-gray-400 mb-2">Can't scan? Use this code manually:</p>
+                  <div class="bg-gray-900/80 rounded border border-gray-700/50 p-2 overflow-x-auto">
+                    <span class="text-emerald-400 font-mono text-sm tracking-wider whitespace-nowrap">{{ mfaSecret }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right side: Form -->
+              <div class="flex flex-col h-full justify-center">
+                <p class="text-gray-300 text-sm mb-6 text-center md:text-left">
+                  Enter the 6-digit code generated by your Authenticator app.
+                </p>
+
+                <form @submit.prevent="handleConfirmMfa">
+                  <div class="flex justify-center md:justify-start gap-2 mb-6">
+                    <input
+                      v-for="(digit, index) in otp"
+                      :key="'mfa-'+index"
+                      type="text"
+                      inputmode="numeric"
+                      maxlength="6"
+                      :data-index="index"
+                      :value="digit"
+                      @input="handleInput(index, $event)"
+                      @keydown="handleKeydown(index, $event)"
+                      class="otp-input !w-10 sm:!w-12 !h-12 sm:!h-14 !text-xl"
+                      :disabled="isSubmitting"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    class="submit-btn group cursor-pointer"
+                    :disabled="isSubmitting || !isOtpComplete"
+                  >
+                    <span class="btn-bg"></span>
+                    <span class="btn-content">
+                      <svg v-if="isSubmitting" class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      <span>{{ isSubmitting ? 'Verifying...' : 'Complete Setup' }}</span>
+                    </span>
+                  </button>
+                </form>
+              </div>
+            </div>
+
             <!-- OTP Input -->
-            <form @submit.prevent="handleSubmit">
+            <form @submit.prevent="handleSubmit" v-else>
               <div class="flex justify-center gap-2 mb-6">
                 <input
                   v-for="(digit, index) in otp"
@@ -198,7 +319,7 @@ const handleResendOTP = async () => {
             </form>
 
             <!-- Resend OTP -->
-            <div class="text-center mt-6">
+            <div class="text-center mt-6" v-if="!isSetupMfaMode">
               <p class="text-gray-400 text-sm">
                 Didn't receive the code?
                 <button

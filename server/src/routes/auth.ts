@@ -4,6 +4,10 @@ import {
     verifyOTP,
     resendOTP,
     login,
+    setupMfa,
+    verifyMfaSetup,
+    loginWithMfa,
+    disableMfa,
     getMe,
     getUserProfileById,
     updateProfile,
@@ -31,6 +35,10 @@ router.post('/register', registerLimiter, ...registerValidation, register)
 router.post('/verify-otp', otpLimiter, ...verifyOtpValidation, verifyOTP)
 router.post('/resend-otp', otpLimiter, ...resendOtpValidation, resendOTP)
 router.post('/login', loginLimiter, ...loginValidation, login)
+router.post('/mfa/setup', setupMfa)
+router.post('/mfa/verify-setup', verifyMfaSetup)
+router.post('/login-mfa', loginWithMfa)
+router.post('/mfa/disable', protect, disableMfa)
 router.post('/forgot-password', otpLimiter, ...resendOtpValidation, forgotPassword)
 router.post('/reset-password', otpLimiter, resetPassword)
 

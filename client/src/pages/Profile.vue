@@ -295,6 +295,28 @@ const handleLogout = async () => {
   router.push('/login')
 }
 
+const handleDisableMFA = async () => {
+  if (!confirm('Are you sure you want to turn off Multi-Factor Authentication?')) return
+  
+  isSaving.value = true
+  errorMessage.value = ''
+  successMessage.value = ''
+  
+  const success = await authStore.disableMFA()
+  if (success) {
+    successMessage.value = 'MFA has been successfully turned off.'
+  } else {
+    errorMessage.value = authStore.error || 'Failed to turn off MFA.'
+  }
+  isSaving.value = false
+}
+
+const handleEnableMFA = () => {
+  if (user.value?.email) {
+    router.push({ path: '/verify-otp', query: { email: user.value.email, setupMfa: 'true' } })
+  }
+}
+
 // Activities and Groups (will be fetched from API when implemented)
 const activities = ref<{ id: number; title: string; date: string; status: string }[]>([])
 const groups = ref<{ id: number; name: string; members: number; role: string }[]>([])
@@ -363,9 +385,31 @@ const groups = ref<{ id: number; name: string; members: number; role: string }[]
           <!-- Action Buttons (Desktop) -->
           <div class="absolute bottom-4 right-8 flex gap-3">
             <button
+              v-if="user?.isMfaSetupComplete && !isEditing"
+              @click="handleDisableMFA"
+              :disabled="isSaving"
+              class="px-5 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 backdrop-blur-xl border border-amber-500/30 text-amber-400 rounded-xl font-medium transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Turn Off MFA
+            </button>
+            <button
+              v-if="user && !user.isMfaSetupComplete && !isEditing"
+              @click="handleEnableMFA"
+              :disabled="isSaving"
+              class="px-5 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 backdrop-blur-xl border border-emerald-500/30 text-emerald-400 rounded-xl font-medium transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Turn On MFA
+            </button>
+            <button
               v-if="!isEditing"
               @click="startEditing"
-              class="px-5 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 text-white rounded-xl font-medium transition-all flex items-center gap-2"
+              class="px-5 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 text-white rounded-xl font-medium transition-all flex items-center gap-2 cursor-pointer"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -374,7 +418,7 @@ const groups = ref<{ id: number; name: string; members: number; role: string }[]
             </button>
             <button
               @click="confirmLogout"
-              class="px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded-xl font-medium transition-all flex items-center gap-2"
+              class="px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded-xl font-medium transition-all flex items-center gap-2 cursor-pointer"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

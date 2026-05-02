@@ -27,6 +27,8 @@ export interface IUser extends Document {
     isVerifiedStudent: boolean
     emailVerificationOTP?: string
     emailVerificationExpires?: Date
+    mfaSecret?: string
+    isMfaSetupComplete: boolean
     passwordResetOTP?: string
     passwordResetExpires?: Date
     failedLoginAttempts: number
@@ -127,6 +129,14 @@ const userSchema = new Schema<IUser>(
         emailVerificationExpires: {
             type: Date,
             select: false,
+        },
+        mfaSecret: {
+            type: String,
+            select: false,
+        },
+        isMfaSetupComplete: {
+            type: Boolean,
+            default: false,
         },
         passwordResetOTP: {
             type: String,

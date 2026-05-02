@@ -21,6 +21,7 @@ export interface User {
     languages?: string[]
     isEmailVerified?: boolean
     isVerifiedStudent?: boolean
+    isMfaSetupComplete?: boolean
     createdAt: string
     updatedAt: string
 }
@@ -32,6 +33,8 @@ export interface AuthResponse {
     user?: User
     requiresVerification?: boolean
     email?: string
+    requiresMfa?: boolean
+    requiresMfaSetup?: boolean
 }
 
 export interface LoginCredentials {

@@ -9,6 +9,7 @@ const authStore = useAuthStore()
 const form = ref({
   email: '',
   password: '',
+  mfaCode: '',
 })
 
 const showPassword = ref(false)
@@ -16,6 +17,7 @@ const isLoaded = ref(false)
 const localError = ref('')
 const isSubmitting = computed(() => authStore.loading)
 const errorMessage = computed(() => localError.value || authStore.error)
+const needsMfa = computed(() => authStore.requiresMfa)
 
 onMounted(() => {
   setTimeout(() => {
@@ -27,20 +29,44 @@ const handleSubmit = async () => {
   authStore.clearError()
   localError.value = ''
   
-  if (!form.value.email || !form.value.password) {
+  if (!needsMfa.value && (!form.value.email || !form.value.password)) {
     localError.value = 'Please enter email and password'
     return
   }
 
-  const success = await authStore.login({
-    email: form.value.email,
-    password: form.value.password,
-  })
+  if (needsMfa.value && !form.value.mfaCode) {
+    localError.value = 'Please enter your authenticator code'
+    return
+  }
+
+  let success = false
+  if (needsMfa.value) {
+    success = await authStore.loginWithMfa({
+      email: form.value.email,
+      token: form.value.mfaCode,
+    })
+  } else {
+    success = await authStore.login({
+      email: form.value.email,
+      password: form.value.password,
+    })
+  }
 
   if (success) {
+    if (authStore.requiresMfa) {
+      // Just received requirement for MFA, stay on page to show MFA input
+      return
+    }
+    if (authStore.requiresMfaSetup) {
+      router.push({
+        path: '/verify-otp',
+        query: { email: authStore.pendingVerificationEmail, setupMfa: 'true' }
+      })
+      return
+    }
     const redirect = router.currentRoute.value.query.redirect as string
     router.push(redirect || '/dashboard')
-  } else if (authStore.pendingVerificationEmail) {
+  } else if (authStore.pendingVerificationEmail && !authStore.requiresMfa && !authStore.requiresMfaSetup) {
     // User needs to verify email first
     router.push({
       path: '/verify-otp',
@@ -152,7 +178,7 @@ const handleSubmit = async () => {
             <!-- Form -->
             <form @submit.prevent="handleSubmit" class="space-y-4">
               <!-- Email -->
-              <div class="input-group">
+              <div class="input-group" v-if="!needsMfa">
                 <label for="email" class="input-label">Email Address</label>
                 <div class="input-wrapper">
                   <svg class="input-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -172,7 +198,7 @@ const handleSubmit = async () => {
               </div>
 
               <!-- Password -->
-              <div class="input-group">
+              <div class="input-group" v-if="!needsMfa">
                 <label for="password" class="input-label">Password</label>
                 <div class="input-wrapper">
                   <svg class="input-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -201,6 +227,25 @@ const handleSubmit = async () => {
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
                   </button>
+                </div>
+              </div>
+
+              <!-- MFA Code -->
+              <div class="input-group" v-if="needsMfa">
+                <label for="mfaCode" class="input-label">Authenticator Code</label>
+                <div class="input-wrapper">
+                  <svg class="input-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.261.99-4.615.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                  </svg>
+                  <input
+                    id="mfaCode"
+                    v-model="form.mfaCode"
+                    type="text"
+                    required
+                    placeholder="000000"
+                    class="input-field-styled"
+                    :disabled="isSubmitting"
+                  />
                 </div>
               </div>
 

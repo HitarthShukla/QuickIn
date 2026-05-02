@@ -49,6 +49,41 @@ export const authService = {
         }
     },
 
+    async setupMFA(email: string): Promise<{ secret: string; qrCodeUrl: string }> {
+        const { data } = await api.post('/auth/mfa/setup', { email })
+        return data
+    },
+
+    async verifyMfaSetup(credentials: { email: string; token: string }): Promise<AuthResponse> {
+        const { data } = await api.post<AuthResponse>('/auth/mfa/verify-setup', credentials)
+        if (data.token) {
+            localStorage.setItem('token', data.token)
+        }
+        if (data.user) {
+            localStorage.setItem('user', JSON.stringify(data.user))
+        }
+        return data
+    },
+
+    async loginWithMfa(credentials: { email: string; token: string }): Promise<AuthResponse> {
+        const { data } = await api.post<AuthResponse>('/auth/login-mfa', credentials)
+        if (data.token) {
+            localStorage.setItem('token', data.token)
+        }
+        if (data.user) {
+            localStorage.setItem('user', JSON.stringify(data.user))
+        }
+        return data
+    },
+
+    async disableMfa(): Promise<AuthResponse> {
+        const { data } = await api.post<AuthResponse>('/auth/mfa/disable')
+        if (data.user) {
+            localStorage.setItem('user', JSON.stringify(data.user))
+        }
+        return data
+    },
+
     async getCurrentUser(): Promise<AuthResponse> {
         const { data } = await api.get<AuthResponse>('/auth/me')
         if (data.user) {
