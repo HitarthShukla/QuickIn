@@ -50,6 +50,14 @@ class ActivityService {
     async deleteActivity(id: string) {
         return api.delete(`/activities/${id}`)
     }
+
+    async submitReview(activityId: string, data: { revieweeId: string, rating: number, feedback?: string }) {
+        return api.post(`/activities/${activityId}/reviews`, data)
+    }
+
+    async getMyReviewedUsers(activityId: string) {
+        return api.get<{ success: boolean; reviewedUserIds: string[] }>(`/activities/${activityId}/reviews/me`)
+    }
 }
 
 export default new ActivityService()

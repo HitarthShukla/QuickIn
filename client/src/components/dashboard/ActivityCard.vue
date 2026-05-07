@@ -9,7 +9,7 @@ const props = defineProps<{
   hasPendingRequest?: boolean
 }>()
 
-const emit = defineEmits(['join', 'leave', 'view-details'])
+const emit = defineEmits(['join', 'leave', 'view-details', 'rate'])
 
 const authStore = useAuthStore()
 
@@ -213,7 +213,14 @@ const getInitials = (name: string) => {
             Manage
           </button>
           <button
-            v-else-if="isParticipant"
+            v-if="(isCreator || isParticipant) && activity.status === 'completed'"
+            class="px-4 py-2 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl hover:bg-amber-500/20 transition-all text-sm font-medium cursor-pointer ml-2"
+            @click="$emit('rate', activity)"
+          >
+            Rate Participants
+          </button>
+          <button
+            v-else-if="isParticipant && activity.status !== 'completed'"
             class="px-4 py-2 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl hover:bg-red-500/20 transition-all text-sm font-medium cursor-pointer"
             @click="$emit('leave')"
           >

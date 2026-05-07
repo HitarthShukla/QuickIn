@@ -42,6 +42,7 @@ const isLoadingRequests = ref(false)
 const isProcessingRequest = ref(false)
 const showDeleteConfirm = ref(false)
 const isDeletingActivity = ref(false)
+const isUpdatingStatus = ref(false)
 
 const user = computed(() => authStore.user)
 
@@ -209,6 +210,26 @@ const handleDeleteActivity = async () => {
     alert(error.response?.data?.message || 'Failed to delete activity')
   } finally {
     isDeletingActivity.value = false
+  }
+}
+
+const completeActivity = async () => {
+  if (!selectedChat.value) return
+  
+  try {
+    isUpdatingStatus.value = true
+    const { data } = await activityService.updateActivityStatus(selectedChat.value.activity._id, 'completed')
+    
+    if (data.success) {
+      selectedChat.value.activity.status = 'completed'
+      await fetchChats()
+      alert('Activity successfully marked as completed!')
+    }
+  } catch (error: any) {
+    console.error('Failed to complete activity:', error)
+    alert(error.response?.data?.message || 'Failed to complete activity')
+  } finally {
+    isUpdatingStatus.value = false
   }
 }
 
@@ -1009,7 +1030,15 @@ onUnmounted(() => {
                         </div>
 
                         <!-- Delete Activity Section -->
-                        <div class="mt-6 pt-6 border-t border-white/10">
+                        <div class="mt-6 pt-6 border-t border-white/10 space-y-3">
+                          <button
+                            v-if="selectedChat?.activity.status !== 'completed'"
+                            @click="completeActivity"
+                            :disabled="isUpdatingStatus"
+                            class="w-full px-4 py-2.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-xl hover:bg-emerald-500/20 transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            ✅ Mark as Completed
+                          </button>
                           <button
                             @click="showDeleteConfirm = true"
                             class="w-full px-4 py-2.5 bg-red-500/10 text-red-400 border border-red-500/30 rounded-xl hover:bg-red-500/20 transition-colors font-medium text-sm"

@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import ActivityCard from './ActivityCard.vue'
 import EditActivityModal from '../modals/EditActivityModal.vue'
 import SendJoinRequestModal from '../modals/SendJoinRequestModal.vue'
+import ReviewModal from '../modals/ReviewModal.vue'
 import activityService from '@/services/activityService'
 import joinRequestService from '@/services/joinRequestService'
 import { useAuthStore } from '@/stores/auth'
@@ -23,6 +24,8 @@ const showEditModal = ref(false)
 const selectedActivity = ref<Activity | null>(null)
 const showJoinRequestModal = ref(false)
 const selectedActivityForRequest = ref<Activity | null>(null)
+const showReviewModal = ref(false)
+const selectedActivityForReview = ref<Activity | null>(null)
 const isSendingRequest = ref(false)
 const isSaving = ref(false)
 
@@ -76,14 +79,15 @@ const fetchActivities = async (reset = false) => {
     if (selectedStatus.value !== 'all') {
       params.status = selectedStatus.value
     }
+    
+    if (user.value?._id) {
+      params.involvedUser = user.value._id
+    }
 
     const { data } = await activityService.getActivities(params)
 
     if (data.success) {
-      // Filter to show only activities created by current user
-      const myActivitiesOnly = data.activities.filter(
-        (activity: Activity) => activity.creator._id === user.value?._id
-      )
+      const myActivitiesOnly = data.activities
       
       if (reset) {
         activities.value = myActivitiesOnly
@@ -268,6 +272,11 @@ onUnmounted(() => {
 defineExpose({
   refresh: () => fetchActivities(true)
 })
+
+const handleRate = (activity: Activity) => {
+  selectedActivityForReview.value = activity
+  showReviewModal.value = true
+}
 </script>
 
 <template>
@@ -343,6 +352,7 @@ defineExpose({
         @join="handleJoin"
         @leave="handleLeave"
         @view-details="handleViewDetails"
+        @rate="handleRate"
       />
 
       <!-- Load More Button -->
@@ -387,6 +397,14 @@ defineExpose({
       :is-sending="isSendingRequest"
       @close="showJoinRequestModal = false"
       @send="handleSendJoinRequest"
+    />
+
+    <!-- Review Modal -->
+    <ReviewModal
+      v-if="showReviewModal && selectedActivityForReview && user"
+      :activity="selectedActivityForReview"
+      :current-user="user"
+      @close="showReviewModal = false"
     />
   </div>
 </template>

@@ -2,11 +2,15 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import ActivityCard from './ActivityCard.vue'
 import SendJoinRequestModal from '../modals/SendJoinRequestModal.vue'
+import ReviewModal from '../modals/ReviewModal.vue'
 import activityService from '@/services/activityService'
 import joinRequestService from '@/services/joinRequestService'
+import { useAuthStore } from '@/stores/auth'
 import type { Activity } from '@/types'
 import socketService from '@/services/socketService'
 
+const authStore = useAuthStore()
+const user = computed(() => authStore.user)
 const activities = ref<Activity[]>([])
 const isLoading = ref(true)
 const page = ref(1)
@@ -14,6 +18,8 @@ const hasMore = ref(false)
 const isLoadingMore = ref(false)
 const showJoinRequestModal = ref(false)
 const selectedActivityForRequest = ref<Activity | null>(null)
+const showReviewModal = ref(false)
+const selectedActivityForReview = ref<Activity | null>(null)
 const isSendingRequest = ref(false)
 const sentRequests = ref<Set<string>>(new Set()) // Track activities user has sent requests for
 
@@ -207,6 +213,11 @@ onUnmounted(() => {
 defineExpose({
   refresh: () => fetchActivities(true)
 })
+
+const handleRate = (activity: Activity) => {
+  selectedActivityForReview.value = activity
+  showReviewModal.value = true
+}
 </script>
 
 <template>
@@ -290,6 +301,7 @@ defineExpose({
         :show-manage-button="false"
         :has-pending-request="sentRequests.has(activity._id)"
         @join="handleJoin(activity)"
+        @rate="handleRate"
         @leave="handleLeave(activity)"
         @view-details="handleViewDetails(activity)"
       />
@@ -312,6 +324,14 @@ defineExpose({
       :is-sending="isSendingRequest"
       @close="showJoinRequestModal = false"
       @send="handleSendJoinRequest"
+    />
+
+    <!-- Review Modal -->
+    <ReviewModal
+      v-if="showReviewModal && selectedActivityForReview && user"
+      :activity="selectedActivityForReview"
+      :current-user="user"
+      @close="showReviewModal = false"
     />
   </div>
 </template>

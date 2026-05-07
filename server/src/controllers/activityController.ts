@@ -83,9 +83,17 @@ export const getActivities = async (req: Request, res: Response): Promise<void> 
         const type = req.query.type as string
         const status = (req.query.status as string) || 'open'
         const timeFilter = req.query.time as string // 'now', 'today', 'week'
+        const involvedUserId = req.query.involvedUser as string
 
         // Build query
         const query: any = {}
+
+        if (involvedUserId) {
+            query.$or = [
+                { creator: involvedUserId },
+                { participants: involvedUserId }
+            ]
+        }
 
         if (type && type !== 'all') {
             query.type = type
@@ -109,14 +117,18 @@ export const getActivities = async (req: Request, res: Response): Promise<void> 
             const endOfWeek = new Date(now)
             endOfWeek.setDate(now.getDate() + 7)
             query.dateTime = { $gte: now, $lte: endOfWeek }
-        } else {
-            // Default: all future activities
-            query.dateTime = { $gte: now }
+        } else if (timeFilter !== 'all') {
+            // Default: only if not explicitly 'all', but 'all' shouldn't restrict to future if we want history
+            if (status === 'open' || status === 'in-progress') {
+                 query.dateTime = { $gte: now }
+            }
         }
+
+        const sortOrder = (status === 'completed' || status === 'cancelled' || timeFilter === 'all') ? -1 : 1
 
         const total = await Activity.countDocuments(query)
         const activities = await Activity.find(query)
-            .sort({ dateTime: 1 })
+            .sort({ dateTime: sortOrder })
             .skip(skip)
             .limit(limit)
             .populate('creator', 'name avatar trustScore badges')

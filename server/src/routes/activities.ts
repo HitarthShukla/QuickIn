@@ -17,6 +17,10 @@ import {
     rejectJoinRequest,
     removeParticipant
 } from '../controllers/joinRequestController.js'
+import {
+    submitReview,
+    getMyReviewedUsersForActivity
+} from '../controllers/reviewController.js'
 import { protect } from '../middleware/auth.js'
 import { validateActivity } from '../middleware/validators.js'
 
@@ -24,6 +28,10 @@ const router = express.Router()
 
 // All routes require authentication
 router.use(protect)
+
+// Review routes
+router.post('/:activityId/reviews', submitReview)
+router.get('/:activityId/reviews/me', getMyReviewedUsersForActivity)
 
 // Activity CRUD routes
 router.post('/', ...validateActivity, createActivity)
